@@ -170,18 +170,27 @@ const App: React.FC = () => {
           setMeasurements={setMeasurements}
         />
 
-        <footer className="h-12 bg-slate-950 border-t border-slate-800 flex items-center px-8 text-[10px] font-medium tracking-tight gap-8 shrink-0">
-          <div className="flex items-center gap-2 text-slate-500 font-mono text-[9px]">
-            <div className={`w-1.5 h-1.5 rounded-full ${mode === 'CALIBRATE' ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'}`}></div>
+        <footer className="h-14 bg-slate-950 border-t border-slate-800 flex items-center px-8 text-[11px] font-medium tracking-tight gap-8 shrink-0">
+          <div className="flex items-center gap-2 text-slate-600 font-mono text-[9px] w-48">
+            <div className={`w-2 h-2 rounded-full ${mode === 'CALIBRATE' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]'}`}></div>
             MODE: {mode}
           </div>
-          <div className="flex-1 text-center">
-            <span className="text-slate-400 font-bold text-[11px]">© Yuan-Wei, Wu</span>
-            <span className="mx-3 text-slate-800">|</span>
-            <span className="text-slate-500 italic tracking-wide">Assistant Professor at Central Police University</span>
+          
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="flex items-center gap-3">
+              <span className="text-slate-300 font-bold tracking-wider text-xs">© 2025 Yuan-Wei, Wu</span>
+              <span className="w-1 h-1 rounded-full bg-slate-700"></span>
+              <span className="text-slate-500 font-semibold uppercase text-[10px] tracking-[0.1em]">All Rights Reserved</span>
+            </div>
+            <div className="text-blue-500/60 font-medium italic text-[10px] mt-0.5 tracking-tight">
+              Assistant Professor at Central Police University
+            </div>
           </div>
-          <div className="ml-auto text-slate-700 font-mono text-[9px] tracking-[0.2em] uppercase">
-            Professional Homography Core v2.2
+
+          <div className="w-48 text-right">
+            <span className="text-slate-700 font-mono text-[9px] tracking-[0.2em] uppercase">
+              Core v2.2.0-STABLE
+            </span>
           </div>
         </footer>
       </main>
