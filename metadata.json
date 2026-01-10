@@ -1,0 +1,7 @@
+{
+  "name": "Perspective Meter Pro",
+  "description": "A professional computer vision tool for measuring real-world distances from 2D images using Homography and Perspective Transformation logic.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
