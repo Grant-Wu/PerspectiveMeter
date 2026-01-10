@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { CalibrationData, AppMode, MeasurementPair, Point, CalibrationTarget } from './types.ts';
+import React, { useState, useMemo, useCallback } from 'react';
+import { CalibrationData, AppMode, MeasurementPair, CalibrationTarget } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import CanvasArea from './components/CanvasArea.tsx';
 import { computeHomography, applyHomography, euclideanDistance, undistortPoint } from './utils/math.ts';
@@ -55,7 +55,6 @@ const App: React.FC = () => {
     const center = { x: imgDims.w / 2, y: imgDims.h / 2 };
     const diag = Math.sqrt(imgDims.w * imgDims.w + imgDims.h * imgDims.h);
 
-    // Use the first target that is fully defined
     const activeTarget = calibration.targets.find(t => t.points.every(p => p.defined));
     if (!activeTarget) return null;
 
@@ -170,10 +169,24 @@ const App: React.FC = () => {
           measurements={measurements}
           setMeasurements={setMeasurements}
         />
+
+        <footer className="h-12 bg-slate-950 border-t border-slate-800 flex items-center px-8 text-[10px] font-medium tracking-tight gap-8 shrink-0">
+          <div className="flex items-center gap-2 text-slate-500 font-mono text-[9px]">
+            <div className={`w-1.5 h-1.5 rounded-full ${mode === 'CALIBRATE' ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'}`}></div>
+            MODE: {mode}
+          </div>
+          <div className="flex-1 text-center">
+            <span className="text-slate-400 font-bold text-[11px]">© Yuan-Wei, Wu</span>
+            <span className="mx-3 text-slate-800">|</span>
+            <span className="text-slate-500 italic tracking-wide">Assistant Professor at Central Police University</span>
+          </div>
+          <div className="ml-auto text-slate-700 font-mono text-[9px] tracking-[0.2em] uppercase">
+            Professional Homography Core v2.2
+          </div>
+        </footer>
       </main>
     </div>
   );
 };
 
-// Fix: Add default export to resolve "no default export" error in index.tsx
 export default App;
