@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { CalibrationData, AppMode, MeasurementPair, Point, CalibrationTarget } from './types';
-import Sidebar from './components/Sidebar';
-import CanvasArea from './components/CanvasArea';
-import { computeHomography, applyHomography, euclideanDistance, undistortPoint } from './utils/math';
+import { CalibrationData, AppMode, MeasurementPair, Point, CalibrationTarget } from './types.ts';
+import Sidebar from './components/Sidebar.tsx';
+import CanvasArea from './components/CanvasArea.tsx';
+import { computeHomography, applyHomography, euclideanDistance, undistortPoint } from './utils/math.ts';
 
 const App: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
@@ -146,15 +146,17 @@ const App: React.FC = () => {
               <span>Import Image</span>
               <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
             </label>
-            {image && <div className="text-[10px] text-slate-500 font-mono bg-slate-950/80 px-3 py-1.5 rounded-md border border-slate-800">DATA: {imgDims.w}x{imgDims.h}px</div>}
+            <div className="h-4 w-[1px] bg-slate-800"></div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Active Canvas</span>
+              <span className="text-[11px] font-mono text-blue-400">{image ? 'img_src_active.raw' : 'NO_SIGNAL'}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-             <div className="text-right">
-                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Perspective Solver</div>
-                <div className={`text-[11px] font-bold ${homographyMatrix ? 'text-emerald-400' : 'text-amber-500'}`}>
-                  {homographyMatrix ? 'CALIBRATION: ACTIVE' : 'AWAITING RECTANGLE (1-4)'}
-                </div>
-             </div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+               <div className={`w-2 h-2 rounded-full ${image ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`}></div>
+               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{image ? 'System Ready' : 'Standby'}</span>
+            </div>
           </div>
         </header>
 
@@ -168,27 +170,10 @@ const App: React.FC = () => {
           measurements={measurements}
           setMeasurements={setMeasurements}
         />
-        
-        <footer className="h-12 bg-slate-950 border-t border-slate-800 flex items-center px-8 text-[10px] font-medium tracking-tight gap-8">
-          <div className="flex items-center gap-2 text-slate-500 font-mono text-[9px]">
-            <div className={`w-1.5 h-1.5 rounded-full ${mode === 'CALIBRATE' ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-emerald-500'}`}></div>
-            MODE: {mode}
-          </div>
-          <div className="flex items-center gap-4 text-slate-500 font-mono text-[9px]">
-            <span className="opacity-60 uppercase">Zoom Level: {Math.round(zoom * 100)}%</span>
-          </div>
-          <div className="flex-1 text-center">
-            <span className="text-slate-400 font-semibold">© Yuan-Wei, Wu</span>
-            <span className="mx-2 text-slate-700">|</span>
-            <span className="text-slate-500 italic">Assistant Professor at Central Police University</span>
-          </div>
-          <div className="ml-auto text-slate-700 font-mono text-[9px] tracking-[0.2em] uppercase">
-            Professional Homography Core v2.2
-          </div>
-        </footer>
       </main>
     </div>
   );
 };
 
+// Fix: Add default export to resolve "no default export" error in index.tsx
 export default App;
