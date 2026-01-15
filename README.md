@@ -1,20 +1,32 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# Perspective Meter Pro
 
-This contains everything you need to run your app locally.
+A professional computer vision tool for measuring real-world distances from 2D images using Homography.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1GkTig8ONbBS6EdgKKVzGWP8gHw4Pau9O
+## Local Development
 
-## Run Locally
+To run this project locally or build it for deployment:
 
-**Prerequisites:**  Node.js
+1. **Install Node.js**: Download from [nodejs.org](https://nodejs.org/).
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Start Development Server**:
+   ```bash
+   npm run dev
+   ```
+4. **Build for Production (GitHub Pages)**:
+   ```bash
+   npm run build
+   ```
 
+## Deployment to GitHub Pages
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Run `npm run build`.
+2. This creates a `dist` folder.
+3. Upload the **contents** of the `dist` folder to the root of your GitHub repository.
+4. Ensure your GitHub Pages settings are set to deploy from the branch where you uploaded these files.
+
+**Author:** Yuan-Wei, Wu
+**Title:** Assistant Professor at Central Police University
