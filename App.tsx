@@ -95,9 +95,9 @@ const App: React.FC = () => {
     let sumSqErr = 0;
 
     activeLines.forEach(vl => {
-      const uS = undistortPoint(vl.start, calibration.lensK1, center, diag);
-      const uE = undistortPoint(vl.end, calibration.lensK1, center, diag);
-      const calcLen = euclideanDistance(applyHomography(uS, homographyMatrix), applyHomography(uE, homographyMatrix));
+      // Logic for using ensemble mean for all errors
+      const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+      const calcLen = mcs.mean;
       const err = calcLen - vl.trueLength;
       sumSqErr += err * err;
       sumAbsPctErr += Math.abs(err / vl.trueLength);
@@ -204,11 +204,9 @@ const App: React.FC = () => {
 
     const updated = validationLines.map(l => {
       if (!l.defined || l.trueLength <= 0) return l;
-      const uS = undistortPoint(l.start, calibration.lensK1, center, diag);
-      const uE = undistortPoint(l.end, calibration.lensK1, center, diag);
-      const calcLen = euclideanDistance(applyHomography(uS, homographyMatrix), applyHomography(uE, homographyMatrix));
-      const errPct = (Math.abs(l.trueLength - calcLen) / l.trueLength) * 100;
+      // All validation lengths now follow the 30-seed ensemble arithmetic mean logic
       const mcs = runMonteCarlo(l.start, l.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+      const errPct = (Math.abs(l.trueLength - mcs.mean) / l.trueLength) * 100;
       return { ...l, errorPct: errPct, mcsUncertainty: mcs.stdDev * 2 };
     });
 
@@ -223,14 +221,13 @@ const App: React.FC = () => {
     const center = { x: imgDims.w / 2, y: imgDims.h / 2 };
     const diag = Math.sqrt(imgDims.w * imgDims.w + imgDims.h * imgDims.h);
     
-    const uA = undistortPoint(measurements.pointA, calibration.lensK1, center, diag);
-    const uB = undistortPoint(measurements.pointB, calibration.lensK1, center, diag);
-    const rawDist = euclideanDistance(applyHomography(uA, homographyMatrix), applyHomography(uB, homographyMatrix));
+    // Core ensemble simulation for primary measurement
+    const mc = runMonteCarlo(measurements.pointA, measurements.pointB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+    const rawDist = mc.mean;
     
     const valEntries = validationLines.filter(vl => vl.defined && vl.trueLength > 0).map(vl => {
-      const vA = undistortPoint(vl.start, calibration.lensK1, center, diag);
-      const vB = undistortPoint(vl.end, calibration.lensK1, center, diag);
-      const mD = euclideanDistance(applyHomography(vA, homographyMatrix), applyHomography(vB, homographyMatrix));
+      const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+      const mD = mcs.mean;
       return {
         id: vl.id, pointA: vl.start, pointB: vl.end, midpoint: { x: (vl.start.x + vl.end.x) / 2, y: (vl.start.y + vl.end.y) / 2 },
         measuredDist: mD, trueDist: vl.trueLength, errorPct: ((mD - vl.trueLength) / (vl.trueLength || 1)) * 100, uncertainty: 0 
@@ -243,8 +240,7 @@ const App: React.FC = () => {
     const biasRes = predictBiasRatio(mid, valEntries);
     const correctedDist = rawDist * biasRes.ratio;
 
-    const mc = runMonteCarlo(measurements.pointA, measurements.pointB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
-    
+    // Use ensemble-averaged stdDev for uncertainty sigma
     const sigmaGPR = biasRes.confidence > 0 ? (biasRes.localSigma) : (correctedDist * 0.15);
     const sigmaTotal = Math.sqrt(Math.pow(mc.stdDev, 2) + Math.pow(sigmaGPR, 2));
     
@@ -277,7 +273,7 @@ const App: React.FC = () => {
       sections: [{
         children: [
           new Paragraph({
-            children: [new TextRun({ text: "TRACE: Traffic Reconstruction & Accident Camera Estimation - Forensic Report (v2.0.2)", bold: true, size: 40 })],
+            children: [new TextRun({ text: "TRACE: Traffic Reconstruction & Accident Camera Estimation - Forensic Report (v2.1.2)", bold: true, size: 40 })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
@@ -301,7 +297,7 @@ const App: React.FC = () => {
               new TextRun({ text: "Bias Correction: ", bold: true }),
               new TextRun("Gaussian Process Regression (GPR) with RBF kernel modeling of validation residuals for localized spatial bias compensation.\n"),
               new TextRun({ text: "Precision Model: ", bold: true }),
-              new TextRun("Forensic intervals follow a combined propagation model: σ_total = √(σ_MCS² + σ_GPR_Local²). This accounts for both Monte Carlo precision (pixel noise) and local prediction variance from the bias model."),
+              new TextRun("Forensic intervals follow a combined propagation model: σ_total = √(σ_MCS² + σ_GPR_Local²). This accounts for both Monte Carlo precision (pixel noise) and local prediction variance from the bias model. All results stabilized via 30-Seed Ensemble Protocol."),
             ],
             spacing: { after: 400 },
           }),
@@ -396,7 +392,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `TRACE_Report_v2.0.2.docx`;
+    link.download = `TRACE_Report_v2.1.2.docx`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -537,7 +533,7 @@ const App: React.FC = () => {
             Copyright © Yuan-Wei Wu, Department of Traffic Science, Central Police University
           </div>
           <div className="text-[8px] font-mono text-slate-400 mt-1 uppercase">
-            Metrological Integrity Engine | Reconstruction Platform v2.0.2.0
+            Metrological Integrity Engine | Reconstruction Platform v2.1.2
           </div>
         </footer>
       </main>

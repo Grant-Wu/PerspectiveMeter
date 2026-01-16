@@ -295,7 +295,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       const updatedEntry = { ...entry, ...updates };
       
-      // If geometric changes occur, recalculate. Otherwise just return updated entry.
+      // If geometric changes occur, recalculate using Ensemble Protocol
       if (updates.pointA || updates.pointB) {
         if (!homographyMatrix || !imgDims.w) return prev;
         const pA = updatedEntry.pointA;
@@ -304,14 +304,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         const center = { x: imgDims.w / 2, y: imgDims.h / 2 };
         const diag = Math.sqrt(imgDims.w * imgDims.w + imgDims.h * imgDims.h);
 
-        const uA = undistortPoint(pA, calibration.lensK1, center, diag);
-        const uB = undistortPoint(pB, calibration.lensK1, center, diag);
-        const rawDist = euclideanDistance(applyHomography(uA, homographyMatrix), applyHomography(uB, homographyMatrix));
+        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+        const rawDist = mc.mean;
         
         const valEntries = validationLines.filter(vl => vl.defined && vl.trueLength > 0).map(vl => {
-          const vA = undistortPoint(vl.start, calibration.lensK1, center, diag);
-          const vB = undistortPoint(vl.end, calibration.lensK1, center, diag);
-          const mD = euclideanDistance(applyHomography(vA, homographyMatrix), applyHomography(vB, homographyMatrix));
+          const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+          const mD = mcs.mean;
           return {
             id: vl.id, pointA: vl.start, pointB: vl.end, midpoint: { x: (vl.start.x + vl.end.x) / 2, y: (vl.start.y + vl.end.y) / 2 },
             measuredDist: mD, trueDist: vl.trueLength, errorPct: ((mD - vl.trueLength) / (vl.trueLength || 1)) * 100, uncertainty: 0 
@@ -321,7 +319,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         const mid = { x: (pA.x + pB.x) / 2, y: (pA.y + pB.y) / 2 };
         const biasRes = predictBiasRatio(mid, valEntries);
         const correctedDist = rawDist * biasRes.ratio;
-        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+        
         const sigmaGPR = biasRes.confidence > 0 ? (biasRes.localSigma) : (correctedDist * 0.15);
         const sigmaTotal = Math.sqrt(Math.pow(mc.stdDev, 2) + Math.pow(sigmaGPR, 2));
         const intervals = { ci90: 1.645 * sigmaTotal, ci95: 1.960 * sigmaTotal, ci99: 2.576 * sigmaTotal };
@@ -355,14 +353,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         const pA = { x: parseFloat(u1), y: parseFloat(v1) };
         const pB = { x: parseFloat(u2), y: parseFloat(v2) };
 
-        const uA = undistortPoint(pA, calibration.lensK1, center, diag);
-        const uB = undistortPoint(pB, calibration.lensK1, center, diag);
-        const rawDist = euclideanDistance(applyHomography(uA, homographyMatrix), applyHomography(uB, homographyMatrix));
+        // Process imports via ensemble protocol for stabilization
+        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+        const rawDist = mc.mean;
         
         const valEntries = validationLines.filter(vl => vl.defined && vl.trueLength > 0).map(vl => {
-          const vA = undistortPoint(vl.start, calibration.lensK1, center, diag);
-          const vB = undistortPoint(vl.end, calibration.lensK1, center, diag);
-          const mD = euclideanDistance(applyHomography(vA, homographyMatrix), applyHomography(vB, homographyMatrix));
+          const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+          const mD = mcs.mean;
           return {
             id: vl.id, pointA: vl.start, pointB: vl.end, midpoint: { x: (vl.start.x + vl.end.x) / 2, y: (vl.start.y + vl.end.y) / 2 },
             measuredDist: mD, trueDist: vl.trueLength, errorPct: ((mD - vl.trueLength) / (vl.trueLength || 1)) * 100, uncertainty: 0 
@@ -372,7 +369,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         const mid = { x: (pA.x + pB.x) / 2, y: (pA.y + pB.y) / 2 };
         const biasRes = predictBiasRatio(mid, valEntries);
         const correctedDist = rawDist * biasRes.ratio;
-        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+        
         const sigmaGPR = biasRes.confidence > 0 ? (biasRes.localSigma) : (correctedDist * 0.15);
         const sigmaTotal = Math.sqrt(Math.pow(mc.stdDev, 2) + Math.pow(sigmaGPR, 2));
         const intervals = { ci90: 1.645 * sigmaTotal, ci95: 1.960 * sigmaTotal, ci99: 2.576 * sigmaTotal };
@@ -455,7 +452,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             const serializer = new XMLSerializer();
             let source = serializer.serializeToString(svgEl);
             if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-            if(!source.match(/^<svg[^>]+xmlns\:xlink="http\:\/\/www\.w3\.org\/1999\/xlink"/)) source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+            if(!source.match(/^<svg[^>]+xmlns\:xlink="http\:\/\/www\.w3\.org\/2000\/svg"/)) source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
             const svgBlob = new Blob(['<?xml version="1.0" standalone="no"?>\r\n', source], {type:"image/svg+xml;charset=utf-8"});
             const url = URL.createObjectURL(svgBlob);
             const link = document.createElement('a');
@@ -468,9 +465,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="h-full bg-slate-900 border-r border-slate-700 p-6 overflow-y-auto flex flex-col gap-6 shadow-xl shrink-0 no-scrollbar" style={{ width: `${width}px` }}>
       <div>
-        <h1 className="text-2xl font-black text-blue-400 mb-1 flex items-center gap-2 tracking-tighter">
+        <h1 style={{ fontFamily: 'Calibri, sans-serif' }} className="text-2xl font-black text-blue-400 mb-1 flex items-center gap-2 tracking-tighter">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 20l-5.447-2.724A2 2 0 013 15.487V5.513a2 2 0 011.553-1.943L9 2l5.447 2.724A2 2 0 0116 6.663v9.974a2 2 0 01-1.553 1.943L9 20z" /></svg>
-          TRACE v2.0.2
+          TRACE v2.1.2
         </h1>
         <p className="text-[9px] text-[#E0E0E0] uppercase tracking-widest font-black leading-tight">Traffic Reconstruction & Accident <br/> Camera Estimation</p>
       </div>

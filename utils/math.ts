@@ -1,4 +1,3 @@
-
 import { Point, CalibrationLine, ValidationLine, ValidationEntry } from '../types';
 
 /**
@@ -249,12 +248,12 @@ export function optimizeHomographyFromLines(
     finalH = multiplyMatrices([1, 0, 0, 0, -1, 0, 0, 0, 1], finalH);
   }
 
-  // Final Calibration Metrics
+  // Final Calibration Metrics with Ensemble Protocol
   let sumSqErr = 0; let sumAbsPctErr = 0;
   activeLines.forEach(line => {
-    const s = undistortPoint(line.start, k1, center, diag);
-    const e = undistortPoint(line.end, k1, center, diag);
-    const d = euclideanDistance(applyHomography(s, finalH), applyHomography(e, finalH));
+    // Ensuring performance metrics use ensemble-averaged estimated lengths
+    const mc = runMonteCarlo(line.start, line.end, finalH, k1, center, diag, 100, 2.0);
+    const d = mc.mean;
     const err = d - line.trueLength;
     sumSqErr += err * err;
     sumAbsPctErr += Math.abs(err / line.trueLength);
@@ -270,7 +269,9 @@ export function optimizeHomographyFromLines(
 }
 
 /**
- * Monte Carlo Simulation (MCS) for Precision Analysis.
+ * Monte Carlo Simulation (MCS) for Precision Analysis using the "30-Seed Ensemble Protocol".
+ * v2.1.2: Iterates through 30 fixed seeds (0-29), performs a seeded MCS for each, 
+ * and returns the arithmetic mean of lengths and standard deviations.
  */
 export function runMonteCarlo(
   pA: Point, 
@@ -282,18 +283,38 @@ export function runMonteCarlo(
   iterations = 100, 
   sigma = 2.0
 ): { mean: number; stdDev: number } {
-  const results: number[] = [];
-  for (let i = 0; i < iterations; i++) {
-    const noise = () => (Math.random() * 2 - 1) * sigma;
-    const nA = { x: pA.x + noise(), y: pA.y + noise() };
-    const nB = { x: pB.x + noise(), y: pB.y + noise() };
-    const uA = undistortPoint(nA, k1, center, diag);
-    const uB = undistortPoint(nB, k1, center, diag);
-    results.push(euclideanDistance(applyHomography(uA, H), applyHomography(uB, H)));
-  }
-  const mean = results.reduce((a, b) => a + b) / iterations;
-  const variance = results.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (iterations - 1 || 1);
-  return { mean, stdDev: Math.sqrt(variance) };
+  // Fixed list of 30 integer seeds to ensure robust estimation
+  const ENSEMBLE_SEEDS = Array.from({ length: 30 }, (_, i) => i);
+  
+  const ensembleResults = ENSEMBLE_SEEDS.map(seedValue => {
+    let currentSeed = seedValue;
+    const seededRandom = () => {
+      // Deterministic LCG for reproducibility within each seed run
+      currentSeed = (currentSeed * 1664525 + 1013904223) % 4294967296;
+      return currentSeed / 4294967296;
+    };
+
+    const localDistances: number[] = [];
+    for (let i = 0; i < iterations; i++) {
+      const noise = () => (seededRandom() * 2 - 1) * sigma;
+      const nA = { x: pA.x + noise(), y: pA.y + noise() };
+      const nB = { x: pB.x + noise(), y: pB.y + noise() };
+      const uA = undistortPoint(nA, k1, center, diag);
+      const uB = undistortPoint(nB, k1, center, diag);
+      localDistances.push(euclideanDistance(applyHomography(uA, H), applyHomography(uB, H)));
+    }
+    
+    const localMean = localDistances.reduce((a, b) => a + b) / iterations;
+    const localVariance = localDistances.reduce((a, b) => a + Math.pow(b - localMean, 2), 0) / (iterations - 1 || 1);
+    
+    return { mean: localMean, stdDev: Math.sqrt(localVariance) };
+  });
+
+  // Return the Arithmetic Mean of the 30 ensemble results for stabilized output
+  const finalMean = ensembleResults.reduce((acc, r) => acc + r.mean, 0) / 30;
+  const finalStd = ensembleResults.reduce((acc, r) => acc + r.stdDev, 0) / 30;
+  
+  return { mean: finalMean, stdDev: finalStd };
 }
 
 /**
