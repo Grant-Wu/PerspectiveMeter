@@ -61,6 +61,10 @@ interface SidebarProps {
   setShowUploader: (val: boolean) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   sourceImage: string | null;
+  // v2.0.2 additions
+  imageGallery: { name: string; data: string }[];
+  activeImageIdx: number;
+  setActiveImageIdx: (idx: number) => void;
 }
 
 /**
@@ -122,7 +126,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   showUploader,
   setShowUploader,
   handleFileUpload,
-  sourceImage
+  sourceImage,
+  imageGallery,
+  activeImageIdx,
+  setActiveImageIdx
 }) => {
   const [datasetName, setDatasetName] = useState("");
   const [selectedDataset, setSelectedDataset] = useState("");
@@ -162,7 +169,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       ...prev,
       [measurementDatasetName]: JSON.parse(JSON.stringify(measurementArchive))
     }));
-    setMeasurementDatasetName("");
+    setDatasetName("");
   };
 
   const handleLoadMeasurements = () => {
@@ -463,22 +470,41 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div>
         <h1 className="text-2xl font-black text-blue-400 mb-1 flex items-center gap-2 tracking-tighter">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 20l-5.447-2.724A2 2 0 013 15.487V5.513a2 2 0 011.553-1.943L9 2l5.447 2.724A2 2 0 0116 6.663v9.974a2 2 0 01-1.553 1.943L9 20z" /></svg>
-          TRACE v2.0.1
+          TRACE v2.0.2
         </h1>
         <p className="text-[9px] text-[#E0E0E0] uppercase tracking-widest font-black leading-tight">Traffic Reconstruction & Accident <br/> Camera Estimation</p>
       </div>
 
       <section className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/50 space-y-4">
-        <button onClick={() => setShowUploader(!showUploader)} className="w-full py-3 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2">🔄 Load/Change Source Image</button>
+        <button onClick={() => setShowUploader(!showUploader)} className="w-full py-3 bg-blue-700 hover:bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2">🔄 Link Source Images (Batch)</button>
         {(showUploader || !sourceImage) && (
           <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
             <label className="w-full py-4 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 transition-all bg-slate-900/50">
               <svg className="w-6 h-6 text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-              <span className="text-[9px] font-black text-slate-400 uppercase">Select Forensic Source</span>
-              <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+              <span className="text-[9px] font-black text-slate-400 uppercase">Select Forensic Sources (Up to 50)</span>
+              <input type="file" accept="image/*" className="hidden" multiple onChange={handleFileUpload} />
             </label>
           </div>
         )}
+
+        {imageGallery.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-slate-800">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Active Image</label>
+            <select 
+              value={activeImageIdx} 
+              onChange={(e) => setActiveImageIdx(parseInt(e.target.value))}
+              className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-[10px] text-blue-400 outline-none focus:border-blue-500 font-mono"
+            >
+              {imageGallery.map((img, idx) => (
+                <option key={idx} value={idx}>{img.name}</option>
+              ))}
+            </select>
+            <div className="text-[8px] font-bold text-slate-500 uppercase text-center">
+              Total Linked: {imageGallery.length} / 50
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center px-1"><h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Image Zoom (%)</h3><span className="text-[11px] font-mono text-blue-400">{(zoom * 100).toFixed(0)}%</span></div>
           <input type="range" min="0.5" max="3" step="0.1" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500" />

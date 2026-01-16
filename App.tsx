@@ -6,7 +6,8 @@ import { optimizeHomographyFromLines, applyHomography, euclideanDistance, undist
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, ImageRun, BorderStyle, HeadingLevel } from 'https://esm.sh/docx';
 
 const App: React.FC = () => {
-  const [image, setImage] = useState<string | null>(null);
+  const [imageGallery, setImageGallery] = useState<{ name: string; data: string }[]>([]);
+  const [activeImageIdx, setActiveImageIdx] = useState<number>(-1);
   const [imgDims, setImgDims] = useState({ w: 0, h: 0 });
   const [mode, setMode] = useState<AppMode>('CALIBRATE');
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('PLACE');
@@ -53,6 +54,20 @@ const App: React.FC = () => {
   const [measurementArchive, setMeasurementArchive] = useState<MeasurementArchiveEntry[]>([]);
   const [homographyMatrix, setHomographyMatrix] = useState<number[] | null>(null);
   const [reprojectionErrors, setReprojectionErrors] = useState<number[]>([]);
+
+  // Current active image data
+  const image = useMemo(() => {
+    return activeImageIdx >= 0 && imageGallery[activeImageIdx] ? imageGallery[activeImageIdx].data : null;
+  }, [imageGallery, activeImageIdx]);
+
+  // Update dimensions when active image changes
+  useEffect(() => {
+    if (image) {
+      const img = new Image();
+      img.onload = () => setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
+      img.src = image;
+    }
+  }, [image]);
   
   /**
    * v1.9.8 Helper: Generate default color based on index (Red -> Purple)
@@ -124,22 +139,25 @@ const App: React.FC = () => {
     setReprojectionErrors([]);
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setMeasurements({ pointA: null, pointB: null });
-      setCalcResult(null);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const loaders = Array.from(files).slice(0, 50).map(file => {
+        return new Promise<{ name: string; data: string }>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            resolve({ name: file.name, data: event.target?.result as string });
+          };
+          reader.readAsDataURL(file);
+        });
+      });
       
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setImage(result);
-        const img = new Image();
-        img.onload = () => setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
-        img.src = result;
-        setShowUploader(false);
-      };
-      reader.readAsDataURL(file);
+      const newImages = await Promise.all(loaders);
+      setImageGallery(prev => [...prev, ...newImages]);
+      if (activeImageIdx === -1) {
+        setActiveImageIdx(0);
+      }
+      setShowUploader(false);
     }
   };
 
@@ -259,7 +277,7 @@ const App: React.FC = () => {
       sections: [{
         children: [
           new Paragraph({
-            children: [new TextRun({ text: "TRACE: Traffic Reconstruction & Accident Camera Estimation - Forensic Report (v2.0.1)", bold: true, size: 40 })],
+            children: [new TextRun({ text: "TRACE: Traffic Reconstruction & Accident Camera Estimation - Forensic Report (v2.0.2)", bold: true, size: 40 })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
@@ -378,7 +396,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `TRACE_Report_v2.0.1.docx`;
+    link.download = `TRACE_Report_v2.0.2.docx`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -464,6 +482,9 @@ const App: React.FC = () => {
         setShowUploader={setShowUploader}
         handleFileUpload={handleFileUpload}
         sourceImage={image}
+        imageGallery={imageGallery}
+        activeImageIdx={activeImageIdx}
+        setActiveImageIdx={setActiveImageIdx}
       />
       
       <div className="w-1 bg-slate-800 hover:bg-blue-600 transition-colors cursor-col-resize active:bg-blue-500 z-50 shrink-0" onMouseDown={() => { isResizing.current = true; }} />
@@ -472,8 +493,8 @@ const App: React.FC = () => {
         <header className="h-16 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-8 z-10 shrink-0">
           <div className="flex items-center gap-4">
             <label className="bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase tracking-widest py-2.5 px-6 rounded-lg cursor-pointer transition-all shadow-lg active:scale-95">
-              <span>Link Source Image</span>
-              <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+              <span>Link Source Images</span>
+              <input type="file" className="hidden" accept="image/*" multiple onChange={handleFileUpload} />
             </label>
             <div className="h-4 w-[1px] bg-slate-800"></div>
             <span className="text-[12px] font-black text-blue-400 tracking-tighter uppercase shrink-0">
@@ -516,7 +537,7 @@ const App: React.FC = () => {
             Copyright © Yuan-Wei Wu, Department of Traffic Science, Central Police University
           </div>
           <div className="text-[8px] font-mono text-slate-400 mt-1 uppercase">
-            Metrological Integrity Engine | Reconstruction Platform v2.0.1.0
+            Metrological Integrity Engine | Reconstruction Platform v2.0.2.0
           </div>
         </footer>
       </main>
