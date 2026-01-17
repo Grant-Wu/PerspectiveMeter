@@ -252,7 +252,7 @@ export function optimizeHomographyFromLines(
   let sumSqErr = 0; let sumAbsPctErr = 0;
   activeLines.forEach(line => {
     // Ensuring performance metrics use ensemble-averaged estimated lengths
-    const mc = runMonteCarlo(line.start, line.end, finalH, k1, center, diag, 100, 2.0);
+    const mc = runMonteCarlo(line.start, line.end, finalH, k1, center, diag, 1000, 2.0);
     const d = mc.mean;
     const err = d - line.trueLength;
     sumSqErr += err * err;
@@ -270,7 +270,7 @@ export function optimizeHomographyFromLines(
 
 /**
  * Monte Carlo Simulation (MCS) for Precision Analysis using the "30-Seed Ensemble Protocol".
- * v2.1.2: Iterates through 30 fixed seeds (0-29), performs a seeded MCS for each, 
+ * v2.1.3: Iterates through 30 fixed seeds (0-29), performs a seeded MCS for each, 
  * and returns the arithmetic mean of lengths and standard deviations.
  */
 export function runMonteCarlo(
@@ -280,7 +280,7 @@ export function runMonteCarlo(
   k1: number, 
   center: Point, 
   diag: number, 
-  iterations = 100, 
+  iterations = 1000, 
   sigma = 2.0
 ): { mean: number; stdDev: number } {
   // Fixed list of 30 integer seeds to ensure robust estimation

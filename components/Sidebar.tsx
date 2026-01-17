@@ -304,11 +304,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         const center = { x: imgDims.w / 2, y: imgDims.h / 2 };
         const diag = Math.sqrt(imgDims.w * imgDims.w + imgDims.h * imgDims.h);
 
-        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
         const rawDist = mc.mean;
         
         const valEntries = validationLines.filter(vl => vl.defined && vl.trueLength > 0).map(vl => {
-          const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+          const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
           const mD = mcs.mean;
           return {
             id: vl.id, pointA: vl.start, pointB: vl.end, midpoint: { x: (vl.start.x + vl.end.x) / 2, y: (vl.start.y + vl.end.y) / 2 },
@@ -354,11 +354,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         const pB = { x: parseFloat(u2), y: parseFloat(v2) };
 
         // Process imports via ensemble protocol for stabilization
-        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+        const mc = runMonteCarlo(pA, pB, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
         const rawDist = mc.mean;
         
         const valEntries = validationLines.filter(vl => vl.defined && vl.trueLength > 0).map(vl => {
-          const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+          const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
           const mD = mcs.mean;
           return {
             id: vl.id, pointA: vl.start, pointB: vl.end, midpoint: { x: (vl.start.x + vl.end.x) / 2, y: (vl.start.y + vl.end.y) / 2 },
@@ -467,7 +467,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div>
         <h1 style={{ fontFamily: 'Calibri, sans-serif' }} className="text-2xl font-black text-blue-400 mb-1 flex items-center gap-2 tracking-tighter">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 20l-5.447-2.724A2 2 0 013 15.487V5.513a2 2 0 011.553-1.943L9 2l5.447 2.724A2 2 0 0116 6.663v9.974a2 2 0 01-1.553 1.943L9 20z" /></svg>
-          TRACE v2.1.2
+          TRACE v2.1.3
         </h1>
         <p className="text-[9px] text-[#E0E0E0] uppercase tracking-widest font-black leading-tight">Traffic Reconstruction & Accident <br/> Camera Estimation</p>
       </div>
@@ -750,8 +750,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                  ))}
               </div>
 
-              {calcResult && (
-                <div className="space-y-4 pt-4 border-t border-slate-800">
+              <div className="space-y-4 pt-4 border-t border-slate-800">
+                {calcResult && (
                   <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-2 shadow-2xl text-center">
                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest block mb-1">Active Result: {measurementArchive[measurementArchive.length-1]?.name}</span>
                     <div className="flex items-baseline justify-center gap-1">
@@ -759,9 +759,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <span className="text-xl font-black text-slate-400">m</span>
                     </div>
                   </div>
-                  <button onClick={onDownloadReport} className="w-full py-3 bg-slate-100 hover:bg-white text-slate-900 rounded-xl font-black uppercase text-[11px] shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">📄 Export TRACE Audit (DOCX)</button>
-                </div>
-              )}
+                )}
+                <button 
+                  onClick={onDownloadReport} 
+                  className="w-full py-4 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl font-black uppercase text-[11px] shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 border border-emerald-500/30"
+                >
+                  📄 Generate Technical Report (.docx)
+                </button>
+              </div>
               {homographyMatrix && birdsEyeView}
             </>
            )}

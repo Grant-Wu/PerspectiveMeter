@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { CalibrationData, AppMode, InteractionMode, MeasurementPair, CalibrationLine, ValidationLine, Point, MeasurementArchiveEntry, ConfidenceIntervals } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
 import CanvasArea from './components/CanvasArea.tsx';
 import { optimizeHomographyFromLines, applyHomography, euclideanDistance, undistortPoint, runMonteCarlo, predictBiasRatio } from './utils/math.ts';
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, ImageRun, BorderStyle, HeadingLevel } from 'https://esm.sh/docx';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, HeadingLevel } from 'https://esm.sh/docx';
 
 const App: React.FC = () => {
   const [imageGallery, setImageGallery] = useState<{ name: string; data: string }[]>([]);
@@ -95,8 +96,7 @@ const App: React.FC = () => {
     let sumSqErr = 0;
 
     activeLines.forEach(vl => {
-      // Logic for using ensemble mean for all errors
-      const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+      const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
       const calcLen = mcs.mean;
       const err = calcLen - vl.trueLength;
       sumSqErr += err * err;
@@ -125,19 +125,6 @@ const App: React.FC = () => {
       };
     });
   }, [homographyMatrix, calibration, imgDims]);
-
-  const resetAnalysis = useCallback(() => {
-    setCalibration({ lines: [], lensK1: 0 });
-    setValidationLines([]);
-    setMeasurements({ pointA: null, pointB: null });
-    setSavedDatasets({});
-    setSavedMeasurementDatasets({});
-    setHomographyMatrix(null);
-    setCalcResult(null);
-    setMeasurementArchive([]);
-    setCalibrationStatus('idle');
-    setReprojectionErrors([]);
-  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -204,8 +191,7 @@ const App: React.FC = () => {
 
     const updated = validationLines.map(l => {
       if (!l.defined || l.trueLength <= 0) return l;
-      // All validation lengths now follow the 30-seed ensemble arithmetic mean logic
-      const mcs = runMonteCarlo(l.start, l.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+      const mcs = runMonteCarlo(l.start, l.end, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
       const errPct = (Math.abs(l.trueLength - mcs.mean) / l.trueLength) * 100;
       return { ...l, errorPct: errPct, mcsUncertainty: mcs.stdDev * 2 };
     });
@@ -221,12 +207,11 @@ const App: React.FC = () => {
     const center = { x: imgDims.w / 2, y: imgDims.h / 2 };
     const diag = Math.sqrt(imgDims.w * imgDims.w + imgDims.h * imgDims.h);
     
-    // Core ensemble simulation for primary measurement
-    const mc = runMonteCarlo(measurements.pointA, measurements.pointB, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+    const mc = runMonteCarlo(measurements.pointA, measurements.pointB, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
     const rawDist = mc.mean;
     
     const valEntries = validationLines.filter(vl => vl.defined && vl.trueLength > 0).map(vl => {
-      const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 100, 2.0);
+      const mcs = runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0);
       const mD = mcs.mean;
       return {
         id: vl.id, pointA: vl.start, pointB: vl.end, midpoint: { x: (vl.start.x + vl.end.x) / 2, y: (vl.start.y + vl.end.y) / 2 },
@@ -235,12 +220,8 @@ const App: React.FC = () => {
     });
 
     const mid = { x: (measurements.pointA.x + measurements.pointB.x) / 2, y: (measurements.pointA.y + measurements.pointB.y) / 2 };
-    
-    // GPR Local Prediction Error Modeling
     const biasRes = predictBiasRatio(mid, valEntries);
     const correctedDist = rawDist * biasRes.ratio;
-
-    // Use ensemble-averaged stdDev for uncertainty sigma
     const sigmaGPR = biasRes.confidence > 0 ? (biasRes.localSigma) : (correctedDist * 0.15);
     const sigmaTotal = Math.sqrt(Math.pow(mc.stdDev, 2) + Math.pow(sigmaGPR, 2));
     
@@ -269,11 +250,14 @@ const App: React.FC = () => {
   }, [homographyMatrix, measurements, calibration, imgDims, validationLines, validationStats, measurementArchive.length, getGradientColor]);
 
   const generateReport = async () => {
+    const center = { x: imgDims.w / 2, y: imgDims.h / 2 };
+    const diag = Math.sqrt(imgDims.w * imgDims.w + imgDims.h * imgDims.h);
+
     const doc = new Document({
       sections: [{
         children: [
           new Paragraph({
-            children: [new TextRun({ text: "TRACE: Traffic Reconstruction & Accident Camera Estimation - Forensic Report (v2.1.2)", bold: true, size: 40 })],
+            children: [new TextRun({ text: "TRACE: Technical Measurement Report (v2.1.3)", bold: true, size: 44 })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
@@ -287,27 +271,22 @@ const App: React.FC = () => {
             spacing: { after: 600 },
           }),
 
-          new Paragraph({ text: "1. Advanced Metrological Methodology", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+          // SECTION 1: Metrological Methodology Introduction
+          new Paragraph({ text: "Metrological Methodology", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
           new Paragraph({
             children: [
-              new TextRun({ text: "Calibration Logic: ", bold: true }),
-              new TextRun("Algorithm utilizes Hartley Normalization to condition point sets. The Homography (H) matrix is solved using SVD optimization with a strict Isotropy Penalty (σmin/σmax > 0.2) to prevent geometric collapse.\n"),
-              new TextRun({ text: "Scale Locking: ", bold: true }),
-              new TextRun("Reference scaling is anchored using the single longest user-provided calibration vector to maximize geometric leverage.\n"),
-              new TextRun({ text: "Bias Correction: ", bold: true }),
-              new TextRun("Gaussian Process Regression (GPR) with RBF kernel modeling of validation residuals for localized spatial bias compensation.\n"),
-              new TextRun({ text: "Precision Model: ", bold: true }),
-              new TextRun("Forensic intervals follow a combined propagation model: σ_total = √(σ_MCS² + σ_GPR_Local²). This accounts for both Monte Carlo precision (pixel noise) and local prediction variance from the bias model. All results stabilized via 30-Seed Ensemble Protocol."),
+              new TextRun("This forensic measurement report utilizes the TRACE (Targeted Rectification and Calibration Engine) framework. The methodology employs Planar Homography for geometric reconstruction from single-view imagery. To account for non-linear lens distortion and local spatial variances, a Gaussian Process Regression (GPR) residual correction model is applied. Measurement uncertainty is quantified using a Multi-Seed Monte Carlo Simulation (30-seed ensemble, n=1,000 for each seed), providing robust confidence intervals for all estimated dimensions."),
             ],
             spacing: { after: 400 },
           }),
 
-          new Paragraph({ text: "2. Calibration Data Matrix", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+          // SECTION 2: Calibration Data Matrix
+          new Paragraph({ text: "Calibration Data Matrix", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
-                children: ["ID", "Start (u,v)", "End (u,v)", "True (m)", "Angle (°)"].map(h => new TableCell({
+                children: ["ID", "Pixel Coordinates (Start)", "Pixel Coordinates (End)", "True Length (m)", "Angle (°)"].map(h => new TableCell({
                   children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })],
                   shading: { fill: "f1f5f9" }
                 }))
@@ -324,44 +303,41 @@ const App: React.FC = () => {
             ]
           }),
 
-          new Paragraph({ text: "3. Empirical Validation Audit", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-          new Paragraph({ text: `Global MAPE: ${validationStats.globalMape.toFixed(2)}%`, spacing: { after: 200 } }),
+          // SECTION 3: Validation Audit
+          new Paragraph({ text: "Validation Audit", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
-                children: ["ID", "Start (u,v)", "End (u,v)", "True (m)", "Error (%)"].map(h => new TableCell({
+                children: ["ID", "Pixel Coordinates (Start)", "Pixel Coordinates (End)", "Measured Length (m)", "True Length (m)", "Error (%)"].map(h => new TableCell({
                   children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })],
                   shading: { fill: "f1f5f9" }
                 }))
               }),
-              ...validationLines.map((vl, idx) => new TableRow({
-                children: [
-                  `Sample ${idx+1}`,
-                  `(${vl.start.x.toFixed(0)}, ${vl.start.y.toFixed(0)})`,
-                  `(${vl.end.x.toFixed(0)}, ${vl.end.y.toFixed(0)})`,
-                  `${vl.trueLength.toFixed(3)}m`,
-                  `${vl.errorPct?.toFixed(2)}%`
-                ].map(v => new TableCell({ children: [new Paragraph(v)] }))
-              }))
+              ...validationLines.map((vl, idx) => {
+                const mcs = homographyMatrix ? runMonteCarlo(vl.start, vl.end, homographyMatrix, calibration.lensK1, center, diag, 1000, 2.0) : { mean: 0 };
+                return new TableRow({
+                  children: [
+                    `V-Audit #${idx+1}`,
+                    `(${vl.start.x.toFixed(0)}, ${vl.start.y.toFixed(0)})`,
+                    `(${vl.end.x.toFixed(0)}, ${vl.end.y.toFixed(0)})`,
+                    `${mcs.mean.toFixed(2)}m`, // Rounded to 2 decimal places per v2.1.3 req
+                    `${vl.trueLength.toFixed(3)}m`,
+                    `${vl.errorPct?.toFixed(2)}%`
+                  ].map(v => new TableCell({ children: [new Paragraph(v)] }))
+                });
+              })
             ]
           }),
 
-          new Paragraph({ text: "4. Corrected Bird's Eye View (Isotropic)", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: "Orientation Config: ", bold: true }),
-              new TextRun(`F-H: ${bevFlipH ? 'Y' : 'N'}, F-V: ${bevFlipV ? 'Y' : 'N'}, Rot: ${bevRotation.toFixed(0)}°, Zoom: ${bevZoom.toFixed(3)}x`),
-            ]
-          }),
-
-          new Paragraph({ text: "5. Forensic Measurement Log", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
+          // SECTION 4: Forensic Measurement Log
+          new Paragraph({ text: "Forensic Measurement Log", heading: HeadingLevel.HEADING_1, spacing: { before: 400, after: 200 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
-                children: ["ID", "P1(u,v)", "P2(u,v)", "Corrected(m)", "Standard Deviation", "90% CI", "95% CI", "99% CI"].map(h => new TableCell({
-                  children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })],
+                children: ["ID", "Pixel Coordinates (Start)", "Pixel Coordinates (End)", "Estimated Length (m)", "Std Dev (sigma)", "90% CI", "95% CI", "99% CI"].map(h => new TableCell({
+                  children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 16 })] })],
                   shading: { fill: "f1f5f9" }
                 }))
               }),
@@ -370,12 +346,12 @@ const App: React.FC = () => {
                   r.name || r.id,
                   `(${r.pointA.x.toFixed(0)}, ${r.pointA.y.toFixed(0)})`,
                   `(${r.pointB.x.toFixed(0)}, ${r.pointB.y.toFixed(0)})`,
-                  `${r.correctedDist.toFixed(2)}`,
-                  `${r.uncertainty.toFixed(2)}`,
+                  `${r.correctedDist.toFixed(2)}`, // Rounded to 2 decimal places per v2.1.3 req
+                  `${r.uncertainty.toFixed(2)}`,   // Rounded to 2 decimal places per v2.1.3 req
                   `[${(r.correctedDist - r.intervals.ci90).toFixed(2)}, ${(r.correctedDist + r.intervals.ci90).toFixed(2)}]`,
                   `[${(r.correctedDist - r.intervals.ci95).toFixed(2)}, ${(r.correctedDist + r.intervals.ci95).toFixed(2)}]`,
                   `[${(r.correctedDist - r.intervals.ci99).toFixed(2)}, ${(r.correctedDist + r.intervals.ci99).toFixed(2)}]`
-                ].map(v => new TableCell({ children: [new Paragraph(v)] }))
+                ].map(v => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: v, size: 16 })] })] }))
               }))
             ]
           }),
@@ -392,7 +368,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `TRACE_Report_v2.1.2.docx`;
+    link.download = `TRACE_Technical_Report.docx`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -533,7 +509,7 @@ const App: React.FC = () => {
             Copyright © Yuan-Wei Wu, Department of Traffic Science, Central Police University
           </div>
           <div className="text-[8px] font-mono text-slate-400 mt-1 uppercase">
-            Metrological Integrity Engine | Reconstruction Platform v2.1.2
+            Metrological Integrity Engine | Reconstruction Platform v2.1.3
           </div>
         </footer>
       </main>
