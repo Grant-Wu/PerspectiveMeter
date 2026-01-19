@@ -467,7 +467,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div>
         <h1 style={{ fontFamily: 'Calibri, sans-serif' }} className="text-2xl font-black text-blue-400 mb-1 flex items-center gap-2 tracking-tighter">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 20l-5.447-2.724A2 2 0 013 15.487V5.513a2 2 0 011.553-1.943L9 2l5.447 2.724A2 2 0 0116 6.663v9.974a2 2 0 01-1.553 1.943L9 20z" /></svg>
-          TRACE v2.1.3
+          TRACE v2.1.5
         </h1>
         <p className="text-[9px] text-[#E0E0E0] uppercase tracking-widest font-black leading-tight">Traffic Reconstruction & Accident <br/> Camera Estimation</p>
       </div>

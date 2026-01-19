@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { CalibrationData, AppMode, InteractionMode, MeasurementPair, CalibrationLine, ValidationLine, Point, MeasurementArchiveEntry, ConfidenceIntervals } from './types.ts';
 import Sidebar from './components/Sidebar.tsx';
@@ -257,7 +256,7 @@ const App: React.FC = () => {
       sections: [{
         children: [
           new Paragraph({
-            children: [new TextRun({ text: "TRACE: Technical Measurement Report (v2.1.3)", bold: true, size: 44 })],
+            children: [new TextRun({ text: "TRACE: Technical Measurement Report (v2.1.5)", bold: true, size: 44 })],
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
@@ -368,7 +367,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `TRACE_Technical_Report.docx`;
+    link.download = `TRACE_Technical_Report_v215.docx`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -509,7 +508,7 @@ const App: React.FC = () => {
             Copyright © Yuan-Wei Wu, Department of Traffic Science, Central Police University
           </div>
           <div className="text-[8px] font-mono text-slate-400 mt-1 uppercase">
-            Metrological Integrity Engine | Reconstruction Platform v2.1.3
+            Metrological Integrity Engine | Reconstruction Platform v2.1.5
           </div>
         </footer>
       </main>
